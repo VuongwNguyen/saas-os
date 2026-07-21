@@ -1,0 +1,76 @@
+name: SaaS OS AI Worker
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: saas-os-ai-worker
+  cancel-in-progress: false
+
+jobs:
+  produce-next-chapter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AI_BRANCH: develope-for-ai
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.6-sol' }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare fixed AI branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --prune origin
+          if git show-ref --verify --quiet "refs/remotes/origin/${AI_BRANCH}"; then
+            git switch -C "${AI_BRANCH}" "origin/${AI_BRANCH}"
+            if git merge-base --is-ancestor "origin/${AI_BRANCH}" origin/main; then
+              git merge --ff-only origin/main
+            fi
+          else
+            git switch -c "${AI_BRANCH}" origin/main
+          fi
+
+      - name: Run one bounded AI task
+        run: python3 .ai/worker.py
+
+      - name: Validate changes
+        run: |
+          python3 .ai/validate.py
+          git diff --check
+
+      - name: Commit and publish for review
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet && test -z "$(git status --porcelain)"; then
+            echo "No changes to publish."
+            exit 0
+          fi
+
+          git config user.name "SaaS OS AI Worker"
+          git config user.email "saas-os-ai-worker@users.noreply.github.com"
+          git add --all
+          git commit -m "Produce next SaaS OS review artifact"
+          git push -u origin "${AI_BRANCH}"
+
+          if test -z "$(gh pr list --head "${AI_BRANCH}" --base main --state open --json number --jq '.[0].number')"; then
+            gh pr create \
+              --base main \
+              --head "${AI_BRANCH}" \
+              --draft \
+              --title "AI review: next SaaS OS chapter" \
+              --body-file .ai/PR_BODY.md
+          fi
