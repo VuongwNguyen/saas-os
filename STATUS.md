@@ -6,7 +6,7 @@ The table below is machine-readable. Keep its five-column structure unchanged.
 
 | ID | Title | Status | Dependencies | Output |
 |---|---|---|---|---|
-| P01-C01 | SaaS Philosophy | BACKLOG | - | - |
+| P01-C01 | SaaS Philosophy | REVIEW | - | volumes/volume-01-foundation/part-01-foundation/chapter-01-saas-philosophy.md |
 | P01-C02 | Company as a System | BACKLOG | P01-C01 | - |
 | P01-C03 | Founder Mindset | BACKLOG | P01-C02 | - |
 | P01-C04 | Product Thinking | BACKLOG | P01-C03 | - |
